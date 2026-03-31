@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "https://machinelearning-production-68fe.up.railway.app/api/$1" }
+  ]
+}
