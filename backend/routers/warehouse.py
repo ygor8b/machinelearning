@@ -6,27 +6,24 @@ router = APIRouter()
 
 
 @router.get("/queue")
-def late_delivery_queue():
+def fraud_priority_queue():
     rows = query(
         """
         SELECT
-            s.shipment_id,
-            s.order_id,
-            s.carrier,
-            s.shipping_method,
-            s.promised_days,
-            s.actual_days,
-            s.late_delivery,
-            s.predicted_late_prob,
+            o.order_id,
             o.order_datetime,
             o.order_total,
+            o.payment_method,
+            o.device_type,
+            o.ip_country,
+            o.is_fraud,
+            o.fraud_probability,
             c.full_name,
             c.customer_id
-        FROM shipments s
-        JOIN orders o ON s.order_id = o.order_id
+        FROM orders o
         JOIN customers c ON o.customer_id = c.customer_id
-        WHERE s.predicted_late_prob IS NOT NULL
-        ORDER BY s.predicted_late_prob DESC
+        WHERE o.fraud_probability IS NOT NULL
+        ORDER BY o.fraud_probability DESC
         LIMIT 50
         """
     )
