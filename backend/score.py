@@ -37,29 +37,38 @@ FEATURE_COLS = [
 ]
 
 
+def _coerce_decimals(df):
+    """Cast any Decimal columns to float so sklearn doesn't see mixed types."""
+    from decimal import Decimal
+    for col in df.columns:
+        if df[col].apply(lambda x: isinstance(x, Decimal)).any():
+            df[col] = df[col].astype(float)
+    return df
+
+
 def _load_data(conn):
     """Pull all required tables from Supabase into DataFrames."""
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     cur.execute("SELECT * FROM orders")
-    orders = pd.DataFrame(cur.fetchall())
+    orders = _coerce_decimals(pd.DataFrame(cur.fetchall()))
 
     cur.execute(
         "SELECT customer_id, birthdate, created_at, gender, "
         "customer_segment, loyalty_tier, state FROM customers"
     )
-    customers = pd.DataFrame(cur.fetchall())
+    customers = _coerce_decimals(pd.DataFrame(cur.fetchall()))
 
     cur.execute(
         "SELECT order_id, quantity, product_id, unit_price FROM order_items"
     )
-    items_raw = pd.DataFrame(cur.fetchall())
+    items_raw = _coerce_decimals(pd.DataFrame(cur.fetchall()))
 
     cur.execute(
         "SELECT order_id, late_delivery, shipping_method, carrier, distance_band "
         "FROM shipments"
     )
-    shipments = pd.DataFrame(cur.fetchall())
+    shipments = _coerce_decimals(pd.DataFrame(cur.fetchall()))
 
     return orders, customers, items_raw, shipments
 
@@ -87,12 +96,12 @@ def _build_features(orders, customers, items_raw, shipments):
     order_ids = df["order_id"].values
 
     # Derived features (cell 7)
-    order_dt = pd.to_datetime(df["order_datetime"])
+    order_dt = pd.to_datetime(df["order_datetime"], format="mixed", utc=True)
     df["customer_age"] = (
-        (order_dt - pd.to_datetime(df["birthdate"])).dt.days // 365
+        (order_dt - pd.to_datetime(df["birthdate"], format="mixed", utc=True)).dt.days // 365
     )
     df["account_tenure_days"] = (
-        (order_dt - pd.to_datetime(df["created_at"])).dt.days
+        (order_dt - pd.to_datetime(df["created_at"], format="mixed", utc=True)).dt.days
     )
     df["billing_eq_shipping"] = (
         df["billing_zip"] == df["shipping_zip"]
@@ -113,17 +122,31 @@ def _build_features(orders, customers, items_raw, shipments):
     return order_ids, X
 
 
+def _ensure_model():
+    """Download model from Supabase Storage if not present on disk."""
+    if os.path.exists(MODEL_PATH):
+        return
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_KEY")
+    if not supabase_url or not supabase_key:
+        raise FileNotFoundError(
+            "fraud_model.sav not found locally and SUPABASE_URL/SUPABASE_SERVICE_KEY "
+            "are not set. Either commit the model file or set the Storage env vars."
+        )
+    print("Downloading fraud_model.sav from Supabase Storage…")
+    from supabase import create_client
+    data = create_client(supabase_url, supabase_key).storage.from_("ml-models").download("fraud_model.sav")
+    with open(MODEL_PATH, "wb") as f:
+        f.write(data)
+    print(f"Model downloaded → {MODEL_PATH}")
+
+
 def run_scoring():
     """
     Score all orders and write fraud_probability back to Supabase.
     Returns a summary dict.
     """
-    if not os.path.exists(MODEL_PATH):
-        raise FileNotFoundError(
-            f"Model file not found at {MODEL_PATH}. "
-            "Run ml.ipynb to train and save fraud_model.sav, "
-            "then copy it to the backend/ directory."
-        )
+    _ensure_model()
 
     model = joblib.load(MODEL_PATH)
 

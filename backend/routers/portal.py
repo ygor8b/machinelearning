@@ -105,7 +105,7 @@ def available_products():
         """
         SELECT product_id, product_name, sku, category, price
         FROM products
-        WHERE is_active = TRUE
+        WHERE is_active = 1
         ORDER BY category, product_name
         """
     )
@@ -134,10 +134,10 @@ def place_order(body: NewOrderRequest):
     product_ids = [item.product_id for item in body.items]
     placeholders = ",".join(["%s"] * len(product_ids))
     products = query(
-        f"SELECT product_id, price FROM products WHERE product_id IN ({placeholders}) AND is_active = TRUE",
+        f"SELECT product_id, price FROM products WHERE product_id IN ({placeholders}) AND is_active = 1",
         product_ids,
     )
-    price_map = {p["product_id"]: p["price"] for p in products}
+    price_map = {p["product_id"]: float(p["price"]) for p in products}
 
     # Validate all products exist and are active
     for item in body.items:
@@ -161,7 +161,7 @@ def place_order(body: NewOrderRequest):
             customer_id, order_datetime, payment_method, device_type, ip_country,
             shipping_state, order_subtotal, shipping_fee, tax_amount, order_total,
             risk_score, is_fraud, promo_used
-        ) VALUES (%s, %s, %s, 'desktop', 'US', %s, %s, %s, %s, %s, 0, FALSE, FALSE)
+        ) VALUES (%s, %s, %s, 'desktop', 'US', %s, %s, %s, %s, %s, 0, 0, 0)
         RETURNING order_id
         """,
         (

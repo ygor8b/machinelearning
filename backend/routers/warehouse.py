@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from db import query
 import score as scoring_module
+import train as training_module
 
 router = APIRouter()
 
@@ -47,3 +48,20 @@ def run_scoring():
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Scoring failed: {e}")
+
+
+@router.post("/train")
+def run_training():
+    try:
+        result = training_module.run_training()
+        return {
+            "status": "success",
+            "message": (
+                f"Model retrained ({result['best_model_type']}) — "
+                f"AUC {result['metrics']['roc_auc']:.4f}, "
+                f"Recall {result['metrics']['recall_fraud']:.4f}"
+            ),
+            **result,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Training failed: {e}")

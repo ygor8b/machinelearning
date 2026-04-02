@@ -36,7 +36,8 @@ export const placeOrder = (body) => post("/api/portal/orders", body);
 
 // ── Warehouse ─────────────────────────────────────────────────────────────────
 export const getWarehouseQueue = () => get("/api/warehouse/queue");
-export const runScoring = () => post("/api/warehouse/score", {});
+export const runScoring        = () => post("/api/warehouse/score", {});
+export const runTraining       = () => post("/api/warehouse/train", {});
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 export const getAdminStats    = () => get("/api/admin/stats");

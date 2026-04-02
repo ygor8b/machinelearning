@@ -95,7 +95,7 @@ def admin_customers(
         params.append(tier)
     if active is not None:
         conditions.append("c.is_active = %s")
-        params.append(bool(active))
+        params.append(int(active))
     where = "WHERE " + " AND ".join(conditions)
 
     count_sql = f"SELECT COUNT(DISTINCT c.customer_id) AS count FROM customers c {where}"
@@ -221,7 +221,7 @@ def admin_products(
         params.append(category)
     if active is not None:
         conditions.append("p.is_active = %s")
-        params.append(bool(active))
+        params.append(int(active))
     where = "WHERE " + " AND ".join(conditions)
 
     count_sql = f"SELECT COUNT(*) AS count FROM products p {where}"

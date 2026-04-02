@@ -1,35 +1,62 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { getWarehouseQueue, runScoring } from "../api";
+import { getWarehouseQueue, runScoring, runTraining } from "../api";
 import FraudBadge from "../components/FraudBadge";
 
 export default function WarehouseQueue() {
-  const [rows,    setRows]    = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [scoring, setScoring] = useState(false);
-  const [message, setMessage] = useState(null);
+  const [rows,     setRows]     = useState(null);
+  const [loading,  setLoading]  = useState(true);
+  const [scoring,  setScoring]  = useState(false);
+  const [training, setTraining] = useState(false);
+  const [message,  setMessage]  = useState(null);
 
-  const loadQueue = () => {
+  // Auto-score on every page view, then load the queue
+  useEffect(() => {
     setLoading(true);
-    getWarehouseQueue()
+    setMessage(null);
+    runScoring()
+      .then((res) => {
+        setMessage({ type: "success", text: res.message });
+        return getWarehouseQueue();
+      })
       .then(setRows)
+      .catch((err) => {
+        setMessage({ type: "warning", text: `Scoring skipped: ${err.message}` });
+        return getWarehouseQueue().then(setRows);
+      })
       .finally(() => setLoading(false));
-  };
-
-  useEffect(loadQueue, []);
+  }, []);
 
   const handleScore = async () => {
     setScoring(true);
     setMessage(null);
     try {
       const res = await runScoring();
-      const type = res.status === "success" ? "success" : "info";
-      setMessage({ type, text: res.message });
-      if (res.status === "success") loadQueue();
+      setMessage({ type: "success", text: res.message });
+      const rows = await getWarehouseQueue();
+      setRows(rows);
     } catch (err) {
-      setMessage({ type: "danger", text: err.message || "Failed to trigger scoring job." });
+      setMessage({ type: "danger", text: err.message || "Scoring failed." });
     } finally {
       setScoring(false);
+    }
+  };
+
+  const handleTrain = async () => {
+    setTraining(true);
+    setMessage(null);
+    try {
+      const res = await runTraining();
+      setMessage({ type: "success", text: res.message });
+      // After retraining, re-score immediately so the queue reflects the new model
+      const scored = await runScoring();
+      setMessage({ type: "success", text: `${res.message} — ${scored.message}` });
+      const rows = await getWarehouseQueue();
+      setRows(rows);
+    } catch (err) {
+      setMessage({ type: "danger", text: err.message || "Training failed." });
+    } finally {
+      setTraining(false);
     }
   };
 
@@ -39,20 +66,29 @@ export default function WarehouseQueue() {
     return "#198754";
   };
 
+  const busy = scoring || training || loading;
+
   return (
     <>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 className="mb-0">Fraud Priority Queue</h2>
           <p className="text-muted mb-0 small">
-            Top 50 orders by ML-predicted fraud probability — click Run Scoring to refresh
+            Top 50 orders by ML-predicted fraud probability — auto-scored on page load
           </p>
         </div>
-        <button className="btn btn-warning" onClick={handleScore} disabled={scoring}>
-          {scoring
-            ? <><span className="spinner-border spinner-border-sm me-2" />Scoring…</>
-            : "Run Scoring"}
-        </button>
+        <div className="d-flex gap-2">
+          <button className="btn btn-outline-primary" onClick={handleScore} disabled={busy}>
+            {scoring
+              ? <><span className="spinner-border spinner-border-sm me-2" />Scoring…</>
+              : "Re-score"}
+          </button>
+          <button className="btn btn-warning" onClick={handleTrain} disabled={busy}>
+            {training
+              ? <><span className="spinner-border spinner-border-sm me-2" />Training…</>
+              : "Retrain Model"}
+          </button>
+        </div>
       </div>
 
       {message && (
@@ -63,14 +99,15 @@ export default function WarehouseQueue() {
       )}
 
       {loading ? (
-        <div className="text-center py-5"><div className="spinner-border text-warning" /></div>
+        <div className="text-center py-5">
+          <div className="spinner-border text-warning mb-2" />
+          <div className="text-muted small">Scoring orders…</div>
+        </div>
       ) : rows === null ? (
         <div className="alert alert-danger">Failed to load queue.</div>
       ) : rows.length === 0 ? (
         <div className="alert alert-info">
-          <strong>No predictions yet.</strong> Click <strong>Run Scoring</strong> to run the fraud
-          detection model against all orders. Make sure <code>fraud_model.sav</code> is in the{" "}
-          <code>backend/</code> directory first.
+          No predictions available yet. Click <strong>Re-score</strong> to run the model.
         </div>
       ) : (
         <div className="table-responsive">
@@ -121,7 +158,8 @@ export default function WarehouseQueue() {
                           }}
                         />
                       </div>
-                      <span className="fw-bold small" style={{ color: probColor(r.fraud_probability), minWidth: 42 }}>
+                      <span className="fw-bold small"
+                        style={{ color: probColor(r.fraud_probability), minWidth: 42 }}>
                         {(r.fraud_probability * 100).toFixed(1)}%
                       </span>
                     </div>
