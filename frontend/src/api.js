@@ -1,10 +1,24 @@
-const get  = (url) => fetch(url).then((r) => r.json());
+const get = (url) =>
+  fetch(url).then(async (r) => {
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      throw new Error(body.detail || `HTTP ${r.status}`);
+    }
+    return r.json();
+  });
+
 const post = (url, body) =>
   fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  }).then((r) => r.json());
+  }).then(async (r) => {
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    return r.json();
+  });
 
 // ── Portal ────────────────────────────────────────────────────────────────────
 export const getPortalCustomers = (q = "") =>
