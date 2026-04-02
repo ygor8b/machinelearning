@@ -60,7 +60,7 @@ export default function Orders() {
                   <th>Payment</th>
                   <th>Device</th>
                   <th>Total</th>
-                  <th>Risk Score</th>
+                  <th>ML Fraud Prob</th>
                   <th>Fraud</th>
                 </tr>
               </thead>
@@ -87,9 +87,13 @@ export default function Orders() {
                     <td className="text-capitalize">{o.device_type}</td>
                     <td>${Number(o.order_total).toFixed(2)}</td>
                     <td>
-                      <span className={`badge ${o.risk_score >= 70 ? "bg-danger" : o.risk_score >= 40 ? "bg-warning text-dark" : "bg-success"}`}>
-                        {Number(o.risk_score).toFixed(0)}
-                      </span>
+                      {o.fraud_probability != null ? (
+                        <span className={`badge ${o.fraud_probability >= 0.5 ? "bg-danger" : o.fraud_probability >= 0.25 ? "bg-warning text-dark" : "bg-success"}`}>
+                          {(o.fraud_probability * 100).toFixed(1)}%
+                        </span>
+                      ) : (
+                        <span className="badge bg-secondary">not scored</span>
+                      )}
                     </td>
                     <td><FraudBadge isFraud={o.is_fraud} /></td>
                   </tr>

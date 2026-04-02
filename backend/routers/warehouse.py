@@ -1,5 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from db import query
+import score as scoring_module
 
 router = APIRouter()
 
@@ -34,12 +35,18 @@ def late_delivery_queue():
 
 @router.post("/score")
 def run_scoring():
-    # TODO: Wire up ML inference job here.
-    # The ML team will replace this stub with either:
-    #   - subprocess.run(["python", "score.py"]) for a local script, or
-    #   - an HTTP call to a Supabase Edge Function
-    # The job should populate shipments.predicted_late_prob for all rows.
-    return {
-        "status": "queued",
-        "message": "Scoring job queued — ML inference not yet wired up. Check back after the ML team integrates the pipeline.",
-    }
+    try:
+        result = scoring_module.run_scoring()
+        return {
+            "status": "success",
+            "message": (
+                f"Scored {result['scored']} orders — "
+                f"{result['flagged']} flagged as likely fraud "
+                f"(avg probability {result['avg_fraud_probability']:.1%})"
+            ),
+            **result,
+        }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Scoring failed: {e}")

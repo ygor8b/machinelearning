@@ -22,8 +22,9 @@ export default function WarehouseQueue() {
     setMessage(null);
     try {
       const res = await runScoring();
-      setMessage({ type: "info", text: res.message });
-      loadQueue();
+      const type = res.status === "success" ? "success" : "info";
+      setMessage({ type, text: res.message });
+      if (res.status === "success") loadQueue();
     } catch {
       setMessage({ type: "danger", text: "Failed to trigger scoring job." });
     } finally {

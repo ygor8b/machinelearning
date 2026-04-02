@@ -27,7 +27,15 @@ export default function OrderDetail() {
 
       {o.is_fraud && (
         <div className="alert alert-danger">
-          <strong>This order has been flagged as fraudulent.</strong> Risk score: {Number(o.risk_score).toFixed(1)}
+          <strong>This order has been flagged as fraudulent.</strong>
+          {o.fraud_probability != null && (
+            <> ML model confidence: <strong>{(o.fraud_probability * 100).toFixed(1)}%</strong></>
+          )}
+        </div>
+      )}
+      {!o.is_fraud && o.fraud_probability != null && o.fraud_probability >= 0.5 && (
+        <div className="alert alert-warning">
+          <strong>ML model flagged this order as high risk</strong> ({(o.fraud_probability * 100).toFixed(1)}% fraud probability) but it has not been manually marked as fraud.
         </div>
       )}
 
@@ -54,6 +62,14 @@ export default function OrderDetail() {
                 <dd className="col-7">{o.promo_used ? (o.promo_code || "Yes") : "No"}</dd>
                 <dt className="col-5 text-muted">Risk Score</dt>
                 <dd className="col-7">{Number(o.risk_score).toFixed(1)}</dd>
+                <dt className="col-5 text-muted">ML Fraud Prob</dt>
+                <dd className="col-7">
+                  {o.fraud_probability != null ? (
+                    <span className={`badge ${o.fraud_probability >= 0.5 ? "bg-danger" : o.fraud_probability >= 0.25 ? "bg-warning text-dark" : "bg-success"}`}>
+                      {(o.fraud_probability * 100).toFixed(1)}%
+                    </span>
+                  ) : <span className="text-muted">not scored</span>}
+                </dd>
               </dl>
             </div>
           </div>

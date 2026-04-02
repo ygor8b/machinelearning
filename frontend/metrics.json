@@ -1,0 +1,34 @@
+{
+  "roc_auc": 0.8592915331196581,
+  "recall_fraud": 0.828125,
+  "precision_fraud": 0.17320261437908496,
+  "f1_fraud": 0.2864864864864865,
+  "accuracy": 0.736,
+  "classification_report": {
+    "Legit": {
+      "precision": 0.984149855907781,
+      "recall": 0.7297008547008547,
+      "f1-score": 0.838036809815951,
+      "support": 936.0
+    },
+    "Fraud": {
+      "precision": 0.17320261437908496,
+      "recall": 0.828125,
+      "f1-score": 0.2864864864864865,
+      "support": 64.0
+    },
+    "accuracy": 0.736,
+    "macro avg": {
+      "precision": 0.578676235143433,
+      "recall": 0.7789129273504274,
+      "f1-score": 0.5622616481512187,
+      "support": 1000.0
+    },
+    "weighted avg": {
+      "precision": 0.9322492324499444,
+      "recall": 0.736,
+      "f1-score": 0.8027375891228653,
+      "support": 1000.0
+    }
+  }
+}

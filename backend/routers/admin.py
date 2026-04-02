@@ -122,7 +122,7 @@ def admin_customer_detail(customer_id: int):
     orders = query(
         """
         SELECT o.order_id, o.order_datetime, o.order_total, o.is_fraud,
-               s.carrier, s.late_delivery
+               o.fraud_probability, s.carrier, s.late_delivery
         FROM orders o
         LEFT JOIN shipments s ON o.order_id = s.order_id
         WHERE o.customer_id = %s
@@ -168,7 +168,8 @@ def admin_orders(
     count_sql = f"SELECT COUNT(*) AS count FROM orders o {where}"
     data_sql = f"""
         SELECT o.order_id, o.order_datetime, o.order_total, o.payment_method,
-               o.device_type, o.is_fraud, o.risk_score, c.full_name, c.customer_id
+               o.device_type, o.is_fraud, o.risk_score, o.fraud_probability,
+               c.full_name, c.customer_id
         FROM orders o
         LEFT JOIN customers c ON o.customer_id = c.customer_id
         {where}
