@@ -17,6 +17,8 @@ def fraud_priority_queue():
             o.payment_method,
             o.device_type,
             o.ip_country,
+            o.shipping_state,
+            o.promo_used,
             o.is_fraud,
             o.fraud_probability,
             c.full_name,

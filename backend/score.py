@@ -157,13 +157,21 @@ def run_scoring():
 
         fraud_probs = model.predict_proba(X)[:, 1]
 
-        # Write results back to the orders table
+        # Write all results in a single bulk UPDATE to avoid per-row lock timeouts
         cur = conn.cursor()
-        for order_id, prob in zip(order_ids, fraud_probs):
-            cur.execute(
-                "UPDATE orders SET fraud_probability = %s WHERE order_id = %s",
-                (float(round(prob, 6)), int(order_id)),
-            )
+        values = [
+            (float(round(prob, 6)), int(order_id))
+            for order_id, prob in zip(order_ids, fraud_probs)
+        ]
+        psycopg2.extras.execute_values(
+            cur,
+            "UPDATE orders SET fraud_probability = data.prob "
+            "FROM (VALUES %s) AS data(prob, order_id) "
+            "WHERE orders.order_id = data.order_id",
+            values,
+            template="(%s, %s)",
+            page_size=500,
+        )
         conn.commit()
     finally:
         conn.close()

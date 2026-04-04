@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { getWarehouseQueue, runScoring, runTraining } from "../api";
-import FraudBadge from "../components/FraudBadge";
 
 export default function WarehouseQueue() {
   const [rows,     setRows]     = useState(null);
@@ -10,7 +9,6 @@ export default function WarehouseQueue() {
   const [training, setTraining] = useState(false);
   const [message,  setMessage]  = useState(null);
 
-  // Auto-score on every page view, then load the queue
   useEffect(() => {
     setLoading(true);
     setMessage(null);
@@ -33,8 +31,7 @@ export default function WarehouseQueue() {
     try {
       const res = await runScoring();
       setMessage({ type: "success", text: res.message });
-      const rows = await getWarehouseQueue();
-      setRows(rows);
+      setRows(await getWarehouseQueue());
     } catch (err) {
       setMessage({ type: "danger", text: err.message || "Scoring failed." });
     } finally {
@@ -47,12 +44,9 @@ export default function WarehouseQueue() {
     setMessage(null);
     try {
       const res = await runTraining();
-      setMessage({ type: "success", text: res.message });
-      // After retraining, re-score immediately so the queue reflects the new model
       const scored = await runScoring();
       setMessage({ type: "success", text: `${res.message} — ${scored.message}` });
-      const rows = await getWarehouseQueue();
-      setRows(rows);
+      setRows(await getWarehouseQueue());
     } catch (err) {
       setMessage({ type: "danger", text: err.message || "Training failed." });
     } finally {
@@ -111,64 +105,111 @@ export default function WarehouseQueue() {
         </div>
       ) : (
         <div className="table-responsive">
-          <table className="table table-hover align-middle">
-            <thead className="table-dark">
-              <tr>
-                <th>#</th>
+          <table className="table table-hover align-middle" style={{ fontSize: "0.875rem" }}>
+            <thead>
+              {/* Group headers */}
+              <tr className="table-dark">
+                <th colSpan={7} className="border-end">Order Details</th>
+                <th colSpan={2} className="text-center border-end" style={{ background: "#4a1942" }}>
+                  ML Prediction
+                </th>
+                <th colSpan={1} className="text-center" style={{ background: "#1a3a4a" }}>
+                  Actual Outcome
+                </th>
+              </tr>
+              {/* Column headers */}
+              <tr className="table-secondary">
+                <th className="text-muted fw-normal">#</th>
                 <th>Order</th>
                 <th>Customer</th>
                 <th>Date</th>
-                <th>Payment</th>
-                <th>Device</th>
-                <th>IP Country</th>
                 <th>Total</th>
-                <th>Fraud Probability</th>
-                <th>Flagged</th>
+                <th>Payment</th>
+                <th className="border-end">Device / IP / State</th>
+                <th className="border-end" style={{ minWidth: 180 }}>Fraud Probability</th>
+                <th className="text-center border-end">ML Verdict</th>
+                <th className="text-center">Confirmed Fraud?</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
-                <tr key={r.order_id} className={r.is_fraud ? "table-danger" : ""}>
-                  <td className="text-muted">{i + 1}</td>
-                  <td>
-                    <Link to={`/admin/orders/${r.order_id}`} className="text-decoration-none fw-semibold">
-                      #{r.order_id}
-                    </Link>
-                  </td>
-                  <td>
-                    <Link to={`/admin/customers/${r.customer_id}`} className="text-decoration-none">
-                      {r.full_name}
-                    </Link>
-                  </td>
-                  <td className="text-muted small">
-                    {new Date(r.order_datetime).toLocaleDateString()}
-                  </td>
-                  <td className="text-capitalize">{r.payment_method}</td>
-                  <td className="text-capitalize">{r.device_type}</td>
-                  <td>{r.ip_country}</td>
-                  <td>${Number(r.order_total).toFixed(2)}</td>
-                  <td style={{ minWidth: 160 }}>
-                    <div className="d-flex align-items-center gap-2">
-                      <div className="progress flex-grow-1" style={{ height: 10 }}>
-                        <div
-                          className="progress-bar"
-                          style={{
-                            width: `${r.fraud_probability * 100}%`,
-                            backgroundColor: probColor(r.fraud_probability),
-                          }}
-                        />
-                      </div>
-                      <span className="fw-bold small"
-                        style={{ color: probColor(r.fraud_probability), minWidth: 42 }}>
-                        {(r.fraud_probability * 100).toFixed(1)}%
+              {rows.map((r, i) => {
+                const prob = r.fraud_probability;
+                const mlFlagged = prob >= 0.5;
+                const rowClass = r.is_fraud ? "table-danger" : mlFlagged ? "table-warning" : "";
+
+                return (
+                  <tr key={r.order_id} className={rowClass}>
+                    <td className="text-muted">{i + 1}</td>
+                    <td>
+                      <Link to={`/admin/orders/${r.order_id}`} className="text-decoration-none fw-semibold">
+                        #{r.order_id}
+                      </Link>
+                      {r.promo_used ? (
+                        <span className="badge bg-info text-dark ms-1" style={{ fontSize: "0.65rem" }}>promo</span>
+                      ) : null}
+                    </td>
+                    <td>
+                      <Link to={`/admin/customers/${r.customer_id}`} className="text-decoration-none">
+                        {r.full_name}
+                      </Link>
+                    </td>
+                    <td className="text-muted">
+                      {new Date(r.order_datetime).toLocaleDateString()}<br />
+                      <span style={{ fontSize: "0.75rem" }}>
+                        {new Date(r.order_datetime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
-                    </div>
-                  </td>
-                  <td><FraudBadge isFraud={r.is_fraud} /></td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="fw-semibold">${Number(r.order_total).toFixed(2)}</td>
+                    <td className="text-capitalize">{r.payment_method}</td>
+                    <td className="border-end">
+                      <div className="text-capitalize">{r.device_type}</div>
+                      <div className="text-muted" style={{ fontSize: "0.75rem" }}>
+                        {r.ip_country}{r.shipping_state ? ` → ${r.shipping_state}` : ""}
+                      </div>
+                    </td>
+
+                    {/* ML Prediction */}
+                    <td className="border-end" style={{ minWidth: 180 }}>
+                      <div className="d-flex align-items-center gap-2">
+                        <div className="progress flex-grow-1" style={{ height: 10 }}>
+                          <div
+                            className="progress-bar"
+                            style={{
+                              width: `${prob * 100}%`,
+                              backgroundColor: probColor(prob),
+                            }}
+                          />
+                        </div>
+                        <span className="fw-bold" style={{ color: probColor(prob), minWidth: 42, fontSize: "0.85rem" }}>
+                          {(prob * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="text-muted" style={{ fontSize: "0.72rem" }}>
+                        {prob >= 0.7 ? "High risk" : prob >= 0.4 ? "Medium risk" : "Low risk"}
+                      </div>
+                    </td>
+                    <td className="text-center border-end">
+                      {mlFlagged
+                        ? <span className="badge bg-danger">Flagged</span>
+                        : <span className="badge bg-success">Clear</span>}
+                    </td>
+
+                    {/* Actual outcome */}
+                    <td className="text-center">
+                      {r.is_fraud
+                        ? <span className="badge bg-danger">Fraud</span>
+                        : <span className="badge bg-secondary">Not fraud</span>}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+
+          <div className="d-flex gap-3 mt-2" style={{ fontSize: "0.8rem" }}>
+            <span><span className="badge bg-danger me-1">■</span>Row highlighted red = confirmed fraud</span>
+            <span><span className="badge bg-warning text-dark me-1">■</span>Row highlighted yellow = ML flagged, not confirmed</span>
+          </div>
         </div>
       )}
     </>
